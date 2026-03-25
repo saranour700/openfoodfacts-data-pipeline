@@ -1,5 +1,4 @@
 # openfoodfacts-data-pipeline
-# OpenFoodFacts Data Pipeline
 
 An end-to-end data engineering project that builds a full pipeline from raw food data to analytical insights using DuckDB and dbt.
 
