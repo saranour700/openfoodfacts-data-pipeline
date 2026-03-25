@@ -1,118 +1,107 @@
 # openfoodfacts-data-pipeline
 # OpenFoodFacts Data Pipeline
 
-This project is my attempt to build a complete data pipeline starting from raw data all the way to analytical insights.
-
-I used the Open Food Facts dataset, which contains a large amount of real-world food data (ingredients, nutrition, categories, etc.), and tried to turn it into something clean and usable for analysis.
+An end-to-end data engineering project that builds a full pipeline from raw food data to analytical insights using DuckDB and dbt.
 
 ---
 
-## Why I built this
+## Overview
 
-I wanted to practice Data Engineering in a real scenario, not just small examples.
+This project focuses on transforming raw OpenFoodFacts data into a structured analytical model that can be used for querying and insights.
 
-Instead of focusing on one tool, I tried to go through the full pipeline:
+The pipeline follows a layered architecture:
 
-* working with messy real-world data
-* cleaning and transforming it
-* designing an analytical model
-* and writing queries that answer real questions
-
----
-
-## Pipeline Overview
-
-```
-Raw Data
-   ↓
-DuckDB (raw layer)
-   ↓
-dbt (silver layer - cleaning & transformation)
-   ↓
-dbt (gold layer - analytical model)
-   ↓
-SQL queries
-```
+* Raw data ingestion
+* Data cleaning and transformation
+* Analytical modeling
+* Querying for insights
 
 ---
 
-## Project structure
+## Project Goals
 
-```
-openfoodfacts-data-pipeline/
-│
-├── notebooks/
-│   └── exploration.ipynb
-│
-├── pipelines/
-│   └── dlt_pipeline.py
-│
-├── off_dbt_project/
-│   ├── models/
-│   │   ├── silver/
-│   │   └── gold/
-│   │
-│   └── dbt_project.yml
-│
-├── sql/
-│   └── analytics.sql
-│
-└── README.md
+* Build a complete ELT pipeline
+* Work with messy real-world data
+* Design an OLAP-style schema
+* Perform analytical queries
+* Understand how dbt works in practice
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A[Raw OpenFoodFacts Data] --> B[DuckDB - Bronze Layer]
+    B --> C[dbt - Silver Layer]
+    C --> D[dbt - Gold Layer]
+    D --> E[SQL Analytics]
 ```
 
 ---
 
-## Data modeling approach
+## Data Pipeline Flow
 
-I followed a layered approach to separate concerns:
-
-### Bronze
-
-Raw data loaded into DuckDB without modification.
+```mermaid
+flowchart LR
+    R[Raw JSON Data] --> L[Load into DuckDB]
+    L --> S[Silver Models - Cleaning & Transformation]
+    S --> G[Gold Models - Fact & Dimensions]
+    G --> Q[SQL Queries & Analytics]
+```
 
 ---
 
-### Silver
+## Data Layers
 
-In this layer, I focused on cleaning and standardizing the data:
+### Bronze Layer
 
-* removed empty strings and replaced them with NULL
-* handled missing values using COALESCE where appropriate
-* converted timestamps to readable datetime
-* flattened nested JSON fields (nutriments) into structured columns
+* Raw dataset loaded into DuckDB
+* No transformations applied
 
-Main models:
+---
+
+### Silver Layer
+
+Handles data cleaning and preparation:
+
+* Removing empty values
+* Standardizing fields
+* Handling missing values
+* Flattening JSON fields (nutriments)
+
+Models:
 
 * silver_products
 * silver_nutriments
 
 ---
 
-### Gold
+### Gold Layer
 
-In this layer, I built an analytical model (star schema style).
+Analytical layer designed for querying:
 
-* fact_products: contains all numerical metrics (energy, sugar, fat, etc.)
-* dim_ingredients: exploded ingredient-level data for analysis
+* fact_products → main fact table with metrics
+* dim_ingredients → ingredient-level analysis
 
-The goal here was to make the data easy to query and suitable for BI tools.
-
----
-
-## Key design decisions
-
-* Used DuckDB for local analytics because it is fast and lightweight
-* Used dbt to manage transformations and dependencies between models
-* Split transformations into silver and gold layers to keep logic organized
-* Flattened JSON early to simplify downstream queries
-* Used LEFT JOIN in the fact table to avoid losing products with missing nutrition data
+This layer is optimized for analytical queries and BI tools.
 
 ---
 
-## Example queries
+## Features
+
+* End-to-end data pipeline
+* JSON data flattening
+* Data cleaning and standardization
+* Star schema modeling
+* Analytical SQL queries
+
+---
+
+## Example Queries
 
 ```sql
--- Top brands by number of products
+-- Top brands by product count
 SELECT brands, COUNT(*) AS product_count
 FROM gold.fact_products
 GROUP BY brands
@@ -121,16 +110,23 @@ LIMIT 10;
 ```
 
 ```sql
--- Products with highest sugar content
+-- Products with highest sugar
 SELECT code, sugars_g
 FROM gold.fact_products
 ORDER BY sugars_g DESC
 LIMIT 10;
 ```
 
+```sql
+-- Average energy per category
+SELECT compared_to_category, AVG(energy_kcal)
+FROM gold.fact_products
+GROUP BY compared_to_category;
+```
+
 ---
 
-## Tools used
+## Tech Stack
 
 * Python
 * DuckDB
@@ -139,40 +135,33 @@ LIMIT 10;
 
 ---
 
-## How to run
+## How to Run
 
-```
+```bash
 source venv/bin/activate
 dbt run
 ```
 
-Then open DuckDB and run queries from the sql/analytics.sql file.
+Then open DuckDB and execute queries from the sql folder.
 
 ---
 
-## What I learned
+## Future Improvements
 
-* How to work with messy, real-world datasets
-* How to structure a data pipeline end-to-end
-* How dbt manages transformations and dependencies
-* How to design tables for analytical use cases
-
----
-
-## Future improvements
-
-* Add dbt tests for data quality
+* Add dbt tests for data validation
 * Improve ingestion using dlt
 * Build a dashboard for visualization
+* Optimize transformations
 
 ---
 
-## About
+## Author
 
 Sara Nour
 
 ---
 
-## Acknowledgment
+## Notes
 
-Thanks to Open Food Facts for providing open data.
+This project is part of my journey in learning Data Engineering and building real-world pipelines step by step.
+
