@@ -1,0 +1,16 @@
+version: 2
+
+sources:
+  - name: bronze
+    schema: bronze
+    tables:
+      - name: products
+        columns:
+          - name: code
+            tests:
+              - not_null
+              - unique
+          - name: _dlt_id
+            tests:
+              - not_null
+              - unique

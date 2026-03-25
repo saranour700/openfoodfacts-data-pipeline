@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: silver_products
+    description: "Cleaned products from Open Food Facts"
+    columns:
+      - name: code
+        description: "Barcode - Primary Key"
+        tests:
+          - not_null
+          - unique
+      - name: nutriscore_grade
+        tests:
+          - accepted_values:
+              values: ['a', 'b', 'c', 'd', 'e']
+      - name: nova_group
+        tests:
+          - accepted_values:
+              values: [1, 2, 3, 4]
