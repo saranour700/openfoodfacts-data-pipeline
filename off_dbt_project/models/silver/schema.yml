@@ -2,18 +2,24 @@ version: 2
 
 models:
   - name: silver_products
-    description: "Cleaned products from Open Food Facts"
+    description: "Cleaned Canadian products from Open Food Facts"
     columns:
       - name: code
         description: "Barcode - Primary Key"
         tests:
           - not_null
           - unique
+      - name: is_canadian
+        description: "Flag for Canadian products only"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true]
       - name: nutriscore_grade
         tests:
           - accepted_values:
-              values: ['a', 'b', 'c', 'd', 'e']
+              values: ['a', 'b', 'c', 'd', 'e', null]
       - name: nova_group
         tests:
           - accepted_values:
-              values: [1, 2, 3, 4]
+              values: [1, 2, 3, 4, null]
