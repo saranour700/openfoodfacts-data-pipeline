@@ -1,16 +1,21 @@
 import duckdb
 import requests
 import json
+import os
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class OFFSyncManager:
-    def __init__(self, db_path: str = "canada_off.db"):
+    def __init__(self, db_path: str = None):
+        db_path = db_path or os.getenv("DUCKDB_PATH", "./canada_off.db")
         self.conn = duckdb.connect(db_path)
         self._setup_metadata_table()
         
     def _setup_metadata_table(self):
-        """Create sync tracking table"""
+        """Create sync metadata tracking table"""
         self.conn.execute("""
             CREATE SCHEMA IF NOT EXISTS sync;
             
@@ -37,16 +42,12 @@ class OFFSyncManager:
         return result[0] if result and result[0] else None
     
     def incremental_sync(self, batch_size: int = 1000) -> Dict:
-        """
-        Sync only new/updated products since last sync
-        Uses last_modified_t field from OFF API
-        """
+        """Sync only new/updated products since last sync"""
         last_sync = self.get_last_sync_time()
         
         print(f"Starting incremental sync...")
         print(f"   Last sync: {last_sync or 'Never'}")
         
-        # Build query URL
         url = "https://world.openfoodfacts.org/api/v2/search"
         params = {
             "countries_tags_en": "canada",
@@ -67,18 +68,15 @@ class OFFSyncManager:
             
             for product in products:
                 code = product.get("code")
-                modified_ts = product.get("last_modified_t")
                 
                 if not code:
                     continue
                 
-                # Check if exists and needs update
                 existing = self.conn.execute("""
                     SELECT 1 FROM bronze.raw_products WHERE code = ?
                 """, [code]).fetchone()
                 
                 if existing:
-                    # Update existing
                     self.conn.execute("""
                         UPDATE bronze.raw_products 
                         SET product_name = ?,
@@ -100,7 +98,6 @@ class OFFSyncManager:
                     ])
                     updated += 1
                 else:
-                    # Insert new
                     self.conn.execute("""
                         INSERT INTO bronze.raw_products 
                         (code, product_name, brands, countries_tags, stores_tags, ingredients_text, data)
@@ -116,9 +113,6 @@ class OFFSyncManager:
                     ])
                     inserted += 1
             
-            total = inserted + updated
-            
-            # Log sync
             self.conn.execute("""
                 INSERT INTO sync.metadata 
                 (last_sync, records_processed, records_inserted, records_updated, status, sync_type)
@@ -142,7 +136,6 @@ class OFFSyncManager:
             }
             
         except Exception as e:
-            # Log failure
             self.conn.execute("""
                 INSERT INTO sync.metadata 
                 (last_sync, records_processed, status, error_message, sync_type)
@@ -164,14 +157,11 @@ class OFFSyncManager:
         """Full refresh - clear and reload"""
         print("Starting FULL REFRESH...")
         
-        # Truncate bronze
         self.conn.execute("DELETE FROM bronze.raw_products")
         
-        # Extract all
-        products = extractor.extract_canadian_products(limit=10000)
+        products = extractor.extract_from_api_v2(10000)
         count = extractor.save_to_bronze(products)
         
-        # Log
         self.conn.execute("""
             INSERT INTO sync.metadata 
             (last_sync, records_processed, records_inserted, status, sync_type)
@@ -185,11 +175,9 @@ class OFFSyncManager:
 if __name__ == "__main__":
     from extraction.off_extractor import CanadianDataExtractor
     
-    # Test incremental sync
     manager = OFFSyncManager()
     result = manager.incremental_sync()
     print(result)
     
-    # Show history
     print("\nSync History:")
     print(manager.get_sync_history())

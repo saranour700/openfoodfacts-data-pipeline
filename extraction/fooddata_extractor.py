@@ -1,6 +1,9 @@
 import requests
 import os
 from typing import Dict, List
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class FoodDataCentralExtractor:
     def __init__(self, api_key: str = None):
@@ -11,7 +14,7 @@ class FoodDataCentralExtractor:
             raise ValueError("FoodData API key required. Set FOODDATA_API_KEY env var.")
     
     def search_foods(self, query: str = "milk", page_size: int = 25) -> List[Dict]:
-        """Search FoodData Central"""
+        """Search FoodData Central API"""
         url = f"{self.base_url}/foods/search"
         params = {
             "api_key": self.api_key,
@@ -40,7 +43,6 @@ class FoodDataCentralExtractor:
 
 
 if __name__ == "__main__":
-    # Test
     extractor = FoodDataCentralExtractor()
     results = extractor.search_foods("cheese", page_size=5)
     for food in results:

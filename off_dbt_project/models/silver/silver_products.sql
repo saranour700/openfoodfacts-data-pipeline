@@ -17,10 +17,10 @@ WITH source AS (
         ingredients_n,
         scans_n,
         unique_scans_n,
-        to_timestamp(created_t)       AS created_at,
-        to_timestamp(last_modified_t) AS last_modified_at,
+        to_timestamp(created_t * 1000) AS created_at,
+        to_timestamp(last_modified_t * 1000) AS last_modified_at,
         countries_tags
-    FROM {{ source('bronze', 'products') }}
+    FROM {{ source('bronze', 'raw_products') }}
 ),
 
 canadian_filter AS (

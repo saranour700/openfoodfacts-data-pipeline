@@ -4,15 +4,19 @@ sources:
   - name: bronze
     schema: bronze
     tables:
-      - name: products
+      - name: raw_products
+        description: "Raw Canadian products from extraction layer"
         columns:
           - name: code
+            description: "Product barcode - Primary Key"
             tests:
               - not_null
               - unique
-          - name: _dlt_id
-            tests:
-              - not_null
-              - unique
-      - name: raw_products
-        description: "Raw Canadian products from extraction"
+          - name: product_name
+            description: "Product name"
+          - name: brands
+            description: "Brand name"
+          - name: countries_tags
+            description: "List of country tags"
+          - name: data
+            description: "Full JSON data"

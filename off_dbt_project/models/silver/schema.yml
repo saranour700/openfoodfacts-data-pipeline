@@ -2,24 +2,66 @@ version: 2
 
 models:
   - name: silver_products
-    description: "Cleaned Canadian products from Open Food Facts"
+    description: "Cleaned Canadian products with data quality filters"
     columns:
       - name: code
-        description: "Barcode - Primary Key"
+        description: "Product barcode - Primary Key"
+        tests:
+          - unique
+          - not_null
+          
+      - name: product_name
+        description: "Cleaned product name"
         tests:
           - not_null
-          - unique
+          
+      - name: brands
+        description: "Brand name"
+        
       - name: is_canadian
-        description: "Flag for Canadian products only"
+        description: "Flag indicating Canadian products only"
         tests:
           - not_null
           - accepted_values:
               values: [true]
+              
       - name: nutriscore_grade
+        description: "Nutrition score grade (a-e)"
         tests:
           - accepted_values:
               values: ['a', 'b', 'c', 'd', 'e', null]
+              
       - name: nova_group
+        description: "NOVA food processing group (1-4)"
         tests:
           - accepted_values:
               values: [1, 2, 3, 4, null]
+              
+      - name: created_at
+        description: "Product creation timestamp"
+        
+      - name: last_modified_at
+        description: "Last modification timestamp"
+
+  - name: silver_nutriments
+    description: "Nutrition facts with casted numeric types"
+    columns:
+      - name: code
+        description: "Product barcode - Foreign Key"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('silver_products')
+              field: code
+              
+      - name: energy_kcal
+        description: "Energy in kcal per 100g"
+        
+      - name: sugars_g
+        description: "Sugars in grams per 100g"
+        
+      - name: fat_g
+        description: "Fat in grams per 100g"
+        
+      - name: proteins_g
+        description: "Proteins in grams per 100g"

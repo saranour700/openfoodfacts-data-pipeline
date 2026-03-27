@@ -1,16 +1,21 @@
 import duckdb
 import requests
 import json
-import gzip
+import time
+import os
 from typing import List, Dict
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class CanadianDataExtractor:
-    def __init__(self, db_path: str = "canada_off.db"):
+    def __init__(self, db_path: str = None):
+        db_path = db_path or os.getenv("DUCKDB_PATH", "./canada_off.db")
         self.conn = duckdb.connect(db_path)
         self._setup_bronze_schema()
         
     def _setup_bronze_schema(self):
-        """Create Bronze layer tables"""
+        """Create Bronze layer schema and tables"""
         self.conn.execute("""
             CREATE SCHEMA IF NOT EXISTS bronze;
             
@@ -26,59 +31,61 @@ class CanadianDataExtractor:
             )
         """)
     
-    def download_and_extract(self, limit: int = 5000) -> List[Dict]:
-        """Download from OFF JSONL dump and filter Canadian"""
-        url = "https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz"
+    def extract_from_api_v2(self, limit: int = 1000) -> List[Dict]:
+        """Extract Canadian products using OFF API v2 with pagination and streaming"""
+        print(f"Extracting {limit} Canadian products...")
         
-        print(f"Downloading OFF dump...")
-        print(f"URL: {url}")
+        all_products = []
+        page = 1
+        max_pages = (limit // 100) + 1
         
-        try:
-            # Download
-            response = requests.get(url, stream=True, timeout=300)
-            response.raise_for_status()
+        while len(all_products) < limit and page <= max_pages:
+            url = "https://world.openfoodfacts.org/api/v2/search"
+            params = {
+                "countries_tags_en": "canada",
+                "fields": "code,product_name,brands,countries_tags,ingredients_text,stores_tags",
+                "page": page,
+                "page_size": 100
+            }
             
-            products = []
-            count = 0
-            canadian_count = 0
+            headers = {
+                "User-Agent": "CanadianDB-Project/1.0 (contact@example.com)"
+            }
             
-            # Stream and process
-            import io
-            with gzip.GzipFile(fileobj=io.BytesIO(response.content)) as gz:
-                for line in gz:
-                    if count >= limit * 3:  # Check more to find Canadian
-                        break
-                    
-                    try:
-                        product = json.loads(line.decode('utf-8'))
-                        count += 1
-                        
-                        # Check if Canadian
-                        countries = product.get("countries_tags", [])
-                        if isinstance(countries, list):
-                            if "en:canada" in countries or any("canada" in c.lower() for c in countries):
-                                products.append(product)
-                                canadian_count += 1
-                                print(f"  Found Canadian: {product.get('product_name', 'N/A')[:50]} ({canadian_count})")
-                                
-                                if canadian_count >= limit:
-                                    break
-                        
-                        if count % 10000 == 0:
-                            print(f"  Scanned {count}, Found {canadian_count} Canadian...")
-                            
-                    except json.JSONDecodeError:
-                        continue
-            
-            print(f"Scanned {count} total, found {len(products)} Canadian products")
-            return products
-            
-        except Exception as e:
-            print(f"Error: {e}")
-            return []
+            try:
+                print(f"  Fetching page {page}...")
+                response = requests.get(
+                    url, 
+                    params=params, 
+                    headers=headers, 
+                    timeout=30
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                products = data.get("products", [])
+                if not products:
+                    print("  No more products found")
+                    break
+                
+                all_products.extend(products)
+                print(f"  Got {len(products)} products (total: {len(all_products)})")
+                page += 1
+                
+                time.sleep(0.5)
+                
+            except requests.exceptions.Timeout:
+                print(f"  Timeout on page {page}, skipping...")
+                break
+            except Exception as e:
+                print(f"  Error on page {page}: {e}")
+                break
+        
+        print(f"Total Canadian products extracted: {len(all_products)}")
+        return all_products[:limit]
     
     def save_to_bronze(self, products: List[Dict]) -> int:
-        """Save raw data to Bronze layer"""
+        """Save extracted products to Bronze layer"""
         count = 0
         for product in products:
             try:
@@ -97,22 +104,26 @@ class CanadianDataExtractor:
                 ])
                 count += 1
             except Exception as e:
-                print(f"  Error saving {product.get('code')}: {e}")
+                print(f"  Error saving product {product.get('code')}: {e}")
         
         print(f"Saved {count} products to Bronze layer")
         return count
     
     def get_product_count(self) -> int:
-        result = self.conn.execute("SELECT COUNT(*) FROM bronze.raw_products").fetchone()
+        """Get total count of products in Bronze layer"""
+        result = self.conn.execute(
+            "SELECT COUNT(*) FROM bronze.raw_products"
+        ).fetchone()
         return result[0]
     
     def close(self):
+        """Close database connection"""
         self.conn.close()
 
 
 if __name__ == "__main__":
     extractor = CanadianDataExtractor()
-    products = extractor.download_and_extract(limit=1000)
+    products = extractor.extract_from_api_v2(500)
     extractor.save_to_bronze(products)
-    print(f"Total in database: {extractor.get_product_count()}")
+    print(f"Database now has {extractor.get_product_count()} products")
     extractor.close()
